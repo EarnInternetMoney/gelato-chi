@@ -1,8 +1,9 @@
 const bre = require("@nomiclabs/buidler");
 
+const { utils } = require("ethers");
+
 module.exports = async ({ getNamedAccounts, deployments }) => {
   if (bre.network.name === "mainnet") return;
-
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
