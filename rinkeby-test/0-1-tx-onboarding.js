@@ -22,10 +22,12 @@ const PROVIDER_MODULE_GNOSIS =
 
 // The gas limit for our automated CHI.mint TX
 // ActionChiMint caps chiAmount to 140 CHI => 6 mio gas should always suffice
-const SELF_PROVIDER_GAS_LIMIT = utils.bigNumberify(6000000); // 6 mio gas
-
-// These are the maximum CHI tokens mintable
-const CHI_TOKENS_MAX = "140";
+const CHI_TOKENS_TO_MINT = 10; // should be kept below 140 MAX!
+const PER_CHI_GAS_EST = 50000;
+const GELATO_OVERHEAD = 200000;
+const SELF_PROVIDER_GAS_LIMIT = utils.bigNumberify(
+  PER_CHI_GAS_EST * CHI_TOKENS_TO_MINT + GELATO_OVERHEAD
+);
 
 // Current Gelato Gas Price
 let currentGelatoGasPrice;
@@ -66,7 +68,10 @@ describe("1-click anything for auto-minting CHI", function () {
     proxyIsDeployed = codeAtProxy === "0x" ? false : true;
 
     if (proxyIsDeployed) {
-      gnosisSafe = await bre.ethers.getContractAt("GnosisSafe", cpk.address);
+      gnosisSafe = await bre.ethers.getContractAt(
+        bre.GnosisSafe.abi,
+        cpk.address
+      );
       expect(await gnosisSafe.isOwner(myUserAddress)).to.be.true;
     }
 
@@ -160,7 +165,7 @@ describe("1-click anything for auto-minting CHI", function () {
           addr: actionChiMint.address,
           data: await actionChiMint.getActionData(
             myUserAddress, // recipient of CHI Tokens
-            CHI_TOKENS_MAX // CHI Tokens to be minted
+            CHI_TOKENS_TO_MINT // CHI Tokens to be minted
           ),
           operation: GelatoCoreLib.Operation.Delegatecall,
           termsOkCheck: false,
@@ -326,7 +331,10 @@ describe("1-click anything for auto-minting CHI", function () {
 
         // Mined !
         // Make sure User is owner of deployed GnosisSafe
-        gnosisSafe = await bre.ethers.getContractAt("GnosisSafe", cpk.address);
+        gnosisSafe = await bre.ethers.getContractAt(
+          bre.GnosisSafe.abi,
+          cpk.address
+        );
         expect(await gnosisSafe.isOwner(myUserAddress)).to.be.true;
 
         // GelatoModule whitelisted on GnosisSafe

@@ -10,6 +10,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   await deploy("ChiToken", {
     from: deployer,
     gas: 4000000,
+    log: true,
   });
 };
 

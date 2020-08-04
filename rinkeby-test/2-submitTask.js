@@ -22,10 +22,12 @@ const PROVIDER_MODULE_GNOSIS =
 
 // The gas limit for our automated CHI.mint TX
 // ActionChiMint caps chiAmount to 140 CHI => 6 mio gas should always suffice
-const SELF_PROVIDER_GAS_LIMIT = 6000000; // 6 mio gas
-
-// These are the maximum CHI tokens mintable
-const CHI_TOKENS_MAX = "140";
+const CHI_TOKENS_TO_MINT = 10; // should be kept below 140 MAX!
+const PER_CHI_GAS_EST = 50000;
+const GELATO_OVERHEAD = 200000;
+const SELF_PROVIDER_GAS_LIMIT = utils.bigNumberify(
+  PER_CHI_GAS_EST * CHI_TOKENS_TO_MINT + GELATO_OVERHEAD
+);
 
 // Current Gelato Gas Price
 let currentGelatoGasPrice;
@@ -150,7 +152,7 @@ describe("Submitting ActionCHIMint Task to Gelato via GnosisSafe", function () {
             addr: actionChiMint.address,
             data: await actionChiMint.getActionData(
               myUserAddress, // recipient of CHI Tokens
-              CHI_TOKENS_MAX // CHI Tokens to be minted
+              CHI_TOKENS_TO_MINT // CHI Tokens to be minted
             ),
             operation: GelatoCoreLib.Operation.Delegatecall,
             termsOkCheck: false,

@@ -51,7 +51,10 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
     proxyIsDeployed = codeAtProxy === "0x" ? false : true;
 
     if (proxyIsDeployed) {
-      gnosisSafe = await bre.ethers.getContractAt("GnosisSafe", cpk.address);
+      gnosisSafe = await bre.ethers.getContractAt(
+        bre.GnosisSafe.abi,
+        cpk.address
+      );
       expect(await gnosisSafe.isOwner(myUserAddress)).to.be.true;
     }
 
@@ -204,7 +207,10 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
 
         // Mined !
         // Make sure User is owner of deployed GnosisSafe
-        gnosisSafe = await bre.ethers.getContractAt("GnosisSafe", cpk.address);
+        gnosisSafe = await bre.ethers.getContractAt(
+          bre.GnosisSafe.abi,
+          cpk.address
+        );
         expect(await gnosisSafe.isOwner(myUserAddress)).to.be.true;
 
         // GelatoModule whitelisted on GnosisSafe

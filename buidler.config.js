@@ -4,7 +4,7 @@ const { utils } = require("ethers");
 const GelatoCoreLib = require("@gelatonetwork/core");
 
 // Contracts
-const GnosisSafe = require("./artifacts/IGnosisSafe.json");
+const GnosisSafe = require("./pre-compiles/GnosisSafe.json");
 
 // Process Env Variables
 require("dotenv").config();

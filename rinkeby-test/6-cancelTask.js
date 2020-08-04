@@ -17,16 +17,6 @@ const { expect } = require("chai");
 const GelatoCoreLib = require("@gelatonetwork/core");
 
 const GELATO = bre.network.config.deployments.GelatoCore;
-const EXECUTOR = bre.network.config.addressBook.gelatoExecutor.default;
-const PROVIDER_MODULE_GNOSIS =
-  bre.network.config.deployments.ProviderModuleGnosisSafeProxy;
-
-// The gas limit for our automated CHI.mint TX
-// ActionChiMint caps chiAmount to 140 CHI => 6 mio gas should always suffice
-const SELF_PROVIDER_GAS_LIMIT = 6000000; // 6 mio gas
-
-// These are the maximum CHI tokens mintable
-const CHI_TOKENS_MAX = "140";
 
 // Current Gelato Gas Price
 let currentGelatoGasPrice;

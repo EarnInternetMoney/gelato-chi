@@ -1,6 +1,19 @@
 const bre = require("@nomiclabs/buidler");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
+  if (bre.network.name == "mainnet") {
+    console.log(
+      "Not redeploying ActionChiMint to mainnet because already deployed but with solc 0.6.12"
+    );
+    console.log(
+      "Bytecode might change if compiled with 0.6.10 and trigger redeployment"
+    );
+    console.log(
+      "BUT, if you changed ActionChiMint source code and want to redeploy, edit this file"
+    );
+    return;
+  }
+
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
@@ -17,6 +30,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
     from: deployer,
     gas: 4000000,
     args: [chiTokenAddress],
+    log: true,
   });
 };
 

@@ -11,6 +11,7 @@ module.exports = async ({ getNamedAccounts, deployments }) => {
   await deploy("MultiSendPayable", {
     from: deployer,
     gas: 4000000,
+    log: true,
   });
 };
 
