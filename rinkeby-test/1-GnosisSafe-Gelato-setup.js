@@ -134,16 +134,16 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
           // If we have not enabled Gelato Module we enable it and then setup Gelato
           tx = await cpk.execTransactions(
             [
-              // {
-              //   to: cpk.address,
-              //   operation: CPK.CALL,
-              //   value: 0,
-              //   data: await bre.run("abi-encode-withselector", {
-              //     abi: bre.GnosisSafe.abi,
-              //     functionname: "enableModule",
-              //     inputs: [GELATO],
-              //   }),
-              // },
+              {
+                to: cpk.address,
+                operation: CPK.CALL,
+                value: 0,
+                data: await bre.run("abi-encode-withselector", {
+                  abi: bre.GnosisSafe.abi,
+                  functionname: "enableModule",
+                  inputs: [GELATO],
+                }),
+              },
               {
                 to: GELATO,
                 operation: CPK.CALL,

@@ -87,7 +87,8 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
     triggerGasPrice = currentGelatoGasPrice;
 
     // FUNDS TO DEPOSIT
-    fundsToDeposit = SELF_PROVIDER_GAS_LIMIT.mul(triggerGasPrice);
+    //fundsToDeposit = SELF_PROVIDER_GAS_LIMIT.mul(triggerGasPrice).add(50000);
+    fundsToDeposit = utils.parseEther("1");
   });
 
   it("In a single tx: [deployProxy], whitelist GnosisModule, setup Gelato, submitTask", async function () {

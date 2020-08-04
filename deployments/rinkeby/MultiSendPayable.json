@@ -1,0 +1,71 @@
+{
+  "abi": [
+    {
+      "inputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "transactions",
+          "type": "bytes"
+        }
+      ],
+      "name": "multiSend",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    }
+  ],
+  "receipt": {
+    "to": null,
+    "from": "0xdA3b66e109FE0f9E63A1C39332382666F32EfDD8",
+    "contractAddress": "0x636D3336B120498CC3B596FF30B20e87d813953f",
+    "transactionIndex": 6,
+    "gasUsed": "193583",
+    "logsBloom": "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "blockHash": "0xe57c51003939554d5b52f8c46cbd86d67588bb91b97034b3685baf90f9fa792a",
+    "transactionHash": "0x4e36053f7b7878b11ae83a7fa2ea808dc900d8f966c7e07d441d84169934f40e",
+    "logs": [],
+    "blockNumber": 6958966,
+    "cumulativeGasUsed": "3558808",
+    "status": 1,
+    "byzantium": true
+  },
+  "address": "0x636D3336B120498CC3B596FF30B20e87d813953f",
+  "args": [],
+  "solcInputHash": "0xa6f01a0f07442d6fc23cf909895c0d2c547995f1b1e1d657452b42211e778d20",
+  "metadata": "{\"compiler\":{\"version\":\"0.5.12+commit.7709ece9\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"transactions\",\"type\":\"bytes\"}],\"name\":\"multiSend\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"}],\"devdoc\":{\"author\":\"Nick Dodson - <nick.dodson@consensys.net>Gon\\u00e7alo S\\u00e1 - <goncalo.sa@consensys.net>Stefan George - <stefan@gnosis.io>Richard Meissner - <richard@gnosis.io>modified by Luis Schliesske\",\"methods\":{\"multiSend(bytes)\":{\"details\":\"Sends multiple transactions and reverts all if one fails.\",\"params\":{\"transactions\":\"Encoded transactions. Each transaction is encoded as a packed bytes of                     operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),                     to as a address (=> 20 bytes),                     value as a uint256 (=> 32 bytes),                     data length as a uint256 (=> 32 bytes),                     data as bytes.                     see abi.encodePacked for more information on packed encoding\"}}},\"title\":\"Multi Send - Allows to batch multiple transactions into one.\"},\"userdoc\":{\"methods\":{}}},\"settings\":{\"compilationTarget\":{\"contracts/MultiSendPayable.sol\":\"MultiSendPayable\"},\"evmVersion\":\"petersburg\",\"libraries\":{},\"metadata\":{\"useLiteralContent\":true},\"optimizer\":{\"enabled\":true,\"runs\":200},\"remappings\":[]},\"sources\":{\"contracts/MultiSendPayable.sol\":{\"content\":\"pragma solidity >=0.5.0 <0.7.0;\\n\\n\\n/// @title Multi Send - Allows to batch multiple transactions into one.\\n/// @author Nick Dodson - <nick.dodson@consensys.net>\\n/// @author Gon\\u00e7alo S\\u00e1 - <goncalo.sa@consensys.net>\\n/// @author Stefan George - <stefan@gnosis.io>\\n/// @author Richard Meissner - <richard@gnosis.io>\\n/// @author modified by Luis Schliesske\\ncontract MultiSendPayable {\\n\\n    bytes32 constant private GUARD_VALUE = keccak256(\\\"multisend.guard.bytes32\\\");\\n\\n    bytes32 guard;\\n\\n    constructor() public {\\n        guard = GUARD_VALUE;\\n    }\\n\\n    /// @dev Sends multiple transactions and reverts all if one fails.\\n    /// @param transactions Encoded transactions. Each transaction is encoded as a packed bytes of\\n    ///                     operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),\\n    ///                     to as a address (=> 20 bytes),\\n    ///                     value as a uint256 (=> 32 bytes),\\n    ///                     data length as a uint256 (=> 32 bytes),\\n    ///                     data as bytes.\\n    ///                     see abi.encodePacked for more information on packed encoding\\n    function multiSend(bytes memory transactions)\\n        public\\n        payable\\n    {\\n        require(guard != GUARD_VALUE, \\\"MultiSend should only be called via delegatecall\\\");\\n        // solium-disable-next-line security/no-inline-assembly\\n        assembly {\\n            let length := mload(transactions)\\n            let i := 0x20\\n            for { } lt(i, length) { } {\\n                // First byte of the data is the operation.\\n                // We shift by 248 bits (256 - 8 [operation byte]) it right since mload will always load 32 bytes (a word).\\n                // This will also zero out unused data.\\n                let operation := shr(0xf8, mload(add(transactions, i)))\\n                // We offset the load address by 1 byte (operation byte)\\n                // We shift it right by 96 bits (256 - 160 [20 address bytes]) to right-align the data and zero out unused data.\\n                let to := shr(0x60, mload(add(transactions, add(i, 0x01))))\\n                // We offset the load address by 21 byte (operation byte + 20 address bytes)\\n                let value := mload(add(transactions, add(i, 0x15)))\\n                // We offset the load address by 53 byte (operation byte + 20 address bytes + 32 value bytes)\\n                let dataLength := mload(add(transactions, add(i, 0x35)))\\n                // We offset the load address by 85 byte (operation byte + 20 address bytes + 32 value bytes + 32 data length bytes)\\n                let data := add(transactions, add(i, 0x55))\\n                let success := 0\\n                switch operation\\n                case 0 { success := call(gas, to, value, data, dataLength, 0, 0) }\\n                case 1 { success := delegatecall(gas, to, data, dataLength, 0, 0) }\\n                if eq(success, 0) { revert(0, 0) }\\n                // Next entry starts at 85 byte + data length\\n                i := add(i, add(0x55, dataLength))\\n            }\\n        }\\n    }\\n}\",\"keccak256\":\"0x4fdc56884bf3253588de05c0c8b952181ad23f187b3c1895ab83685dc5be2410\"}},\"version\":1}",
+  "bytecode": "0x608060405234801561001057600080fd5b50604080517f6d756c746973656e642e67756172642e627974657333320000000000000000008152905190819003601701902060005561022a806100556000396000f3fe60806040526004361061001e5760003560e01c80638d80ff0a14610023575b600080fd5b6100c96004803603602081101561003957600080fd5b81019060208101813564010000000081111561005457600080fd5b82018360208201111561006657600080fd5b8035906020019184600183028401116401000000008311171561008857600080fd5b91908080601f0160208091040260200160405190810160405280939291908181526020018383808284376000920191909152509295506100cb945050505050565b005b604080517f6d756c746973656e642e67756172642e6279746573333200000000000000000081529051908190036017019020600054141561013d5760405162461bcd60e51b81526004018080602001828103825260308152602001806101c66030913960400191505060405180910390fd5b805160205b818110156101c0578083015160f81c6001820184015160601c6015830185015160358401860151605585018701600085600081146101875760018114610197576101a2565b6000808585888a5af191506101a2565b6000808585895af491505b50806101ad57600080fd5b8260550187019650505050505050610142565b50505056fe4d756c746953656e642073686f756c64206f6e6c792062652063616c6c6564207669612064656c656761746563616c6ca265627a7a72315820d583c485fde558bd378a7d9ac0032ed2009797901a8f4dfe8c886fccd4a008b664736f6c634300050c0032",
+  "deployedBytecode": "0x60806040526004361061001e5760003560e01c80638d80ff0a14610023575b600080fd5b6100c96004803603602081101561003957600080fd5b81019060208101813564010000000081111561005457600080fd5b82018360208201111561006657600080fd5b8035906020019184600183028401116401000000008311171561008857600080fd5b91908080601f0160208091040260200160405190810160405280939291908181526020018383808284376000920191909152509295506100cb945050505050565b005b604080517f6d756c746973656e642e67756172642e6279746573333200000000000000000081529051908190036017019020600054141561013d5760405162461bcd60e51b81526004018080602001828103825260308152602001806101c66030913960400191505060405180910390fd5b805160205b818110156101c0578083015160f81c6001820184015160601c6015830185015160358401860151605585018701600085600081146101875760018114610197576101a2565b6000808585888a5af191506101a2565b6000808585895af491505b50806101ad57600080fd5b8260550187019650505050505050610142565b50505056fe4d756c746953656e642073686f756c64206f6e6c792062652063616c6c6564207669612064656c656761746563616c6ca265627a7a72315820d583c485fde558bd378a7d9ac0032ed2009797901a8f4dfe8c886fccd4a008b664736f6c634300050c0032",
+  "devdoc": {
+    "author": "Nick Dodson - <nick.dodson@consensys.net>Gonçalo Sá - <goncalo.sa@consensys.net>Stefan George - <stefan@gnosis.io>Richard Meissner - <richard@gnosis.io>modified by Luis Schliesske",
+    "methods": {
+      "multiSend(bytes)": {
+        "details": "Sends multiple transactions and reverts all if one fails.",
+        "params": {
+          "transactions": "Encoded transactions. Each transaction is encoded as a packed bytes of                     operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),                     to as a address (=> 20 bytes),                     value as a uint256 (=> 32 bytes),                     data length as a uint256 (=> 32 bytes),                     data as bytes.                     see abi.encodePacked for more information on packed encoding"
+        }
+      }
+    },
+    "title": "Multi Send - Allows to batch multiple transactions into one."
+  },
+  "userdoc": {
+    "methods": {}
+  },
+  "gasEstimates": {
+    "creation": {
+      "codeDepositCost": "110800",
+      "executionCost": "20243",
+      "totalCost": "131043"
+    },
+    "external": {
+      "multiSend(bytes)": "infinite"
+    }
+  }
+}

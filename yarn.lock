@@ -2373,7 +2373,7 @@ content-type@~1.0.4:
 
 "contract-proxy-kit-custom@https://github.com/gelatodigital/contract-proxy-kit":
   version "1.1.1"
-  resolved "https://github.com/gelatodigital/contract-proxy-kit#68135a46c6f280544852616a1a80bac4eb8da2b9"
+  resolved "https://github.com/gelatodigital/contract-proxy-kit#5f62429786e85656ef8334fcd8b782d26dd4438f"
 
 convert-source-map@^1.5.0, convert-source-map@^1.5.1:
   version "1.7.0"
