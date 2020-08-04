@@ -36,7 +36,7 @@ let triggerGasPrice;
 // FUNDS TO DEPOSIT
 let fundsToDeposit = 0;
 
-describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
+describe("1-click anything for auto-minting CHI", function () {
   // No timeout for Mocha due to Rinkeby mining latency
   this.timeout(0);
 
@@ -87,8 +87,10 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
     triggerGasPrice = currentGelatoGasPrice;
 
     // FUNDS TO DEPOSIT
-    //fundsToDeposit = SELF_PROVIDER_GAS_LIMIT.mul(triggerGasPrice).add(50000);
-    fundsToDeposit = utils.parseEther("1");
+    fundsToDeposit = await gelatoCore.minExecProviderFunds(
+      SELF_PROVIDER_GAS_LIMIT,
+      triggerGasPrice
+    );
   });
 
   it("In a single tx: [deployProxy], whitelist GnosisModule, setup Gelato, submitTask", async function () {
@@ -242,7 +244,11 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
               gasLimit: 5000000,
             }
           );
-        } else {
+        } else if (
+          !fundsAlreadyProvided ||
+          !isDefaultExecutorAssigned ||
+          !isUserProxyModuleWhitelisted
+        ) {
           // If we already enabled Gelato Module we only setup Gelato and submitTask
           console.log("\n Sending TX to setup UserProxy and submitTask");
 
@@ -286,6 +292,32 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
               gasLimit: 5000000,
             }
           );
+        } else {
+          // If we already enabled Gelato Module and already setup Gelato
+          console.log("\n Sending TX to submitTask");
+
+          tx = await cpk.execTransactions(
+            [
+              {
+                operation: CPK.CALL,
+                to: GELATO,
+                value: 0,
+                data: await bre.run("abi-encode-withselector", {
+                  abi: GelatoCoreLib.GelatoCore.abi,
+                  functionname: "submitTask",
+                  inputs: [
+                    myGelatoProvider,
+                    taskAutoMintCHIWhenTriggerGasPrice,
+                    EXPIRY_DATE,
+                  ],
+                }),
+              },
+            ],
+            {
+              value: fundsAlreadyProvided ? 0 : fundsToDeposit,
+              gasLimit: 5000000,
+            }
+          );
         }
 
         // Wait for mining
@@ -298,28 +330,34 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
         expect(await gnosisSafe.isOwner(myUserAddress)).to.be.true;
 
         // GelatoModule whitelisted on GnosisSafe
-        // expect(await gnosisSafe.isModuleEnabled(GELATO)).to.be.true;
-        // console.log(`✅ Gelato GnosisModule whitelisted.`);
+        if (!gelatoIsWhitelisted) {
+          expect(await gnosisSafe.isModuleEnabled(GELATO)).to.be.true;
+          console.log(`✅ Tx: Gelato GnosisModule whitelisted.`);
+        }
 
         // Provided Funds on Gelato
-        expect(await gelatoCore.providerFunds(gnosisSafe.address)).to.be.gte(
-          fundsToDeposit
-        );
-        console.log(
-          `✅ Deposited ${utils.formatEther(fundsToDeposit)} ETH on gelato`
-        );
-        console.log(
-          `Funds on Gelato: ${utils.formatEther(
-            await gelatoCore.providerFunds(gnosisSafe.address)
-          )} ETH`
-        );
+        if (!fundsAlreadyProvided) {
+          expect(await gelatoCore.providerFunds(gnosisSafe.address)).to.be.gte(
+            fundsToDeposit
+          );
+          console.log(
+            `✅ Tx: Deposited ${utils.formatEther(
+              fundsToDeposit
+            )} ETH on gelato`
+          );
+          console.log(
+            `Funds on Gelato: ${utils.formatEther(
+              await gelatoCore.providerFunds(gnosisSafe.address)
+            )} ETH`
+          );
+        }
 
         // Gelato Default Executor assigned
         if (!isDefaultExecutorAssigned) {
           expect(
             await gelatoCore.executorByProvider(gnosisSafe.address)
           ).to.be.equal(EXECUTOR);
-          console.log(`✅ Selected default execution network: ${EXECUTOR}`);
+          console.log(`✅ Tx: Selected default execution network: ${EXECUTOR}`);
         }
 
         // ProviderModuleGnosisSafeProxy whitelisted on Gelato
@@ -331,7 +369,7 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
             )
           ).to.be.true;
           console.log(
-            `✅ Whitelisted ProviderModuleGnosisSafeProxy: ${PROVIDER_MODULE_GNOSIS}`
+            `✅ Tx: Whitelisted ProviderModuleGnosisSafeProxy: ${PROVIDER_MODULE_GNOSIS}`
           );
         }
 
