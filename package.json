@@ -6,6 +6,7 @@
   "author": "gitpusha",
   "private": false,
   "scripts": {
+    "onboard": "npx buidler test rinkeby-test/0-1-tx-onboarding.js --network rinkeby",
     "setup-proxy": "npx buidler test rinkeby-test/1-GnosisSafe-Gelato-setup.js --network rinkeby",
     "submit-task": "npx buidler test rinkeby-test/2-submitTask.js --network rinkeby",
     "withdraw-from-gelato": "npx buidler test rinkeby-test/3-unprovide-ETH.js --network rinkeby",

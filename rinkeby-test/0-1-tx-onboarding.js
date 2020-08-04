@@ -20,7 +20,21 @@ const EXECUTOR = bre.network.config.addressBook.gelatoExecutor.default;
 const PROVIDER_MODULE_GNOSIS =
   bre.network.config.deployments.ProviderModuleGnosisSafeProxy;
 
-const FUNDS_TO_DEPOSIT = utils.parseEther("1");
+// The gas limit for our automated CHI.mint TX
+// ActionChiMint caps chiAmount to 140 CHI => 6 mio gas should always suffice
+const SELF_PROVIDER_GAS_LIMIT = utils.bigNumberify(6000000); // 6 mio gas
+
+// These are the maximum CHI tokens mintable
+const CHI_TOKENS_MAX = "140";
+
+// Current Gelato Gas Price
+let currentGelatoGasPrice;
+
+// TRIGGER GAS PRICE
+let triggerGasPrice;
+
+// FUNDS TO DEPOSIT
+let fundsToDeposit = 0;
 
 describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
   // No timeout for Mocha due to Rinkeby mining latency
@@ -35,8 +49,9 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
   //  one, we will use that one.
   let cpk;
   let gnosisSafe;
-
   let proxyIsDeployed;
+
+  let gelatoCore;
 
   before(async function () {
     // We get our User Wallet from the Buidler Runtime Env
@@ -60,9 +75,22 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
       \n CPK Proxy address: ${cpk.address}\
       \n Proxy deployed?:   ${proxyIsDeployed}\n
     `);
+
+    gelatoCore = await ethers.getContractAt(
+      GelatoCoreLib.GelatoCore.abi,
+      network.config.deployments.GelatoCore // the Rinkeby Address of the deployed GelatoCore
+    );
+
+    currentGelatoGasPrice = await bre.run("fetchGelatoGasPrice");
+
+    // FOR TESTING WE SET IT EQUAL TO CURRENT SO WE CAN CHECK FOR EXECUTION
+    triggerGasPrice = currentGelatoGasPrice;
+
+    // FUNDS TO DEPOSIT
+    fundsToDeposit = SELF_PROVIDER_GAS_LIMIT.mul(triggerGasPrice);
   });
 
-  it("Gelato: Whitelist GnosisModule and setup (funds, executor, ProviderModule)", async function () {
+  it("In a single tx: [deployProxy], whitelist GnosisModule, setup Gelato, submitTask", async function () {
     // Check if Gelato is already whitelisted as Safe Module
     let gelatoIsWhitelisted = false;
     if (proxyIsDeployed)
@@ -70,15 +98,9 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
     if (gelatoIsWhitelisted === true)
       console.log(`✅ Gelato Safe Module ALREADY whitelisted.`);
 
-    // Instantiate GelatoCore contract instance for sanity checks
-    const gelatoCore = await ethers.getContractAt(
-      GelatoCoreLib.GelatoCore.abi,
-      network.config.deployments.GelatoCore // the Rinkeby Address of the deployed GelatoCore
-    );
-
     // Check current funding on Gelato
     const currentProviderFunds = await gelatoCore.providerFunds(cpk.address);
-    const fundsAlreadyProvided = currentProviderFunds.gte(FUNDS_TO_DEPOSIT);
+    const fundsAlreadyProvided = currentProviderFunds.gte(fundsToDeposit);
     if (fundsAlreadyProvided) {
       console.log(
         `\n ✅ Already provided ${utils.formatEther(
@@ -116,10 +138,45 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
     if (isUserProxyModuleWhitelisted)
       console.log("\n ✅ UserProxyModule ALREADY whitelisted");
 
+    // To submit Tasks to  Gelato we need to instantiate a GelatoProvider object
+    const myGelatoProvider = new GelatoCoreLib.GelatoProvider({
+      addr: cpk.address, // This time, the provider is paying for the Task, hence we input the Providers address
+      module: PROVIDER_MODULE_GNOSIS,
+    });
+
+    let actionChiMint = await deployments.get("ActionChiMint");
+    actionChiMint = await bre.ethers.getContractAt(
+      actionChiMint.abi,
+      actionChiMint.address
+    );
+
+    // Specify and Instantiate the Gelato Task
+    const taskAutoMintCHIWhenTriggerGasPrice = new GelatoCoreLib.Task({
+      actions: [
+        new GelatoCoreLib.Action({
+          addr: actionChiMint.address,
+          data: await actionChiMint.getActionData(
+            myUserAddress, // recipient of CHI Tokens
+            CHI_TOKENS_MAX // CHI Tokens to be minted
+          ),
+          operation: GelatoCoreLib.Operation.Delegatecall,
+          termsOkCheck: false,
+        }),
+      ],
+      selfProviderGasLimit: SELF_PROVIDER_GAS_LIMIT,
+      // This makes sure we only mint CHI when the gelatoGasPrice is at or below
+      // our desired trigger gas price
+      selfProviderGasPriceCeil: triggerGasPrice,
+    });
+
+    // Specify ExpiryDate: 0 for infinite validity
+    const EXPIRY_DATE = 0;
+
     // The single Transaction that:
     // 1) deploys a GnosisSafeProxy if not deployed
     // 2) enableModule(GELATO on GnosisSafe
     // 3) multiProvide(funds, executor, providerModuleGnosisSafeProxy) on Gelato
+    // 4) submitTask to GELATO
     if (
       !gelatoIsWhitelisted ||
       !fundsAlreadyProvided ||
@@ -127,27 +184,29 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
       !isUserProxyModuleWhitelisted
     ) {
       try {
-        console.log("\n Sending Transaction to setup UserProxy");
-
         let tx;
         if (!gelatoIsWhitelisted) {
           // If we have not enabled Gelato Module we enable it and then setup Gelato
+          // and submitTask
+          console.log(
+            "\n Sending TX to whitelist Gelato Gnosis Module, setup UserProxy and submitTask"
+          );
           tx = await cpk.execTransactions(
             [
-              // {
-              //   to: cpk.address,
-              //   operation: CPK.CALL,
-              //   value: 0,
-              //   data: await bre.run("abi-encode-withselector", {
-              //     abi: bre.GnosisSafe.abi,
-              //     functionname: "enableModule",
-              //     inputs: [GELATO],
-              //   }),
-              // },
+              {
+                to: cpk.address,
+                operation: CPK.CALL,
+                value: 0,
+                data: await bre.run("abi-encode-withselector", {
+                  abi: bre.GnosisSafe.abi,
+                  functionname: "enableModule",
+                  inputs: [GELATO],
+                }),
+              },
               {
                 to: GELATO,
                 operation: CPK.CALL,
-                value: fundsAlreadyProvided ? 0 : FUNDS_TO_DEPOSIT,
+                value: fundsAlreadyProvided ? 0 : fundsToDeposit,
                 data: await bre.run("abi-encode-withselector", {
                   abi: GelatoCoreLib.GelatoCore.abi,
                   functionname: "multiProvide",
@@ -162,20 +221,36 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
                   ],
                 }),
               },
+              {
+                operation: CPK.CALL,
+                to: GELATO,
+                value: 0,
+                data: await bre.run("abi-encode-withselector", {
+                  abi: GelatoCoreLib.GelatoCore.abi,
+                  functionname: "submitTask",
+                  inputs: [
+                    myGelatoProvider,
+                    taskAutoMintCHIWhenTriggerGasPrice,
+                    EXPIRY_DATE,
+                  ],
+                }),
+              },
             ],
             {
-              value: fundsAlreadyProvided ? 0 : FUNDS_TO_DEPOSIT,
+              value: fundsAlreadyProvided ? 0 : fundsToDeposit,
               gasLimit: 5000000,
             }
           );
         } else {
-          // If we already enabled Gelato Module we only setup Gelato
+          // If we already enabled Gelato Module we only setup Gelato and submitTask
+          console.log("\n Sending TX to setup UserProxy and submitTask");
+
           tx = await cpk.execTransactions(
             [
               {
                 to: GELATO,
                 operation: CPK.CALL,
-                value: fundsAlreadyProvided ? 0 : FUNDS_TO_DEPOSIT,
+                value: fundsAlreadyProvided ? 0 : fundsToDeposit,
                 data: await bre.run("abi-encode-withselector", {
                   abi: GelatoCoreLib.GelatoCore.abi,
                   functionname: "multiProvide",
@@ -190,16 +265,30 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
                   ],
                 }),
               },
+              {
+                operation: CPK.CALL,
+                to: GELATO,
+                value: 0,
+                data: await bre.run("abi-encode-withselector", {
+                  abi: GelatoCoreLib.GelatoCore.abi,
+                  functionname: "submitTask",
+                  inputs: [
+                    myGelatoProvider,
+                    taskAutoMintCHIWhenTriggerGasPrice,
+                    EXPIRY_DATE,
+                  ],
+                }),
+              },
             ],
             {
-              value: fundsAlreadyProvided ? 0 : FUNDS_TO_DEPOSIT,
+              value: fundsAlreadyProvided ? 0 : fundsToDeposit,
               gasLimit: 5000000,
             }
           );
         }
 
         // Wait for mining
-        console.log("TX:", tx.hash);
+        console.log("📓 all-in-one TX:", tx.hash);
         await tx.transactionResponse.wait();
 
         // Mined !
@@ -208,15 +297,15 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
         expect(await gnosisSafe.isOwner(myUserAddress)).to.be.true;
 
         // GelatoModule whitelisted on GnosisSafe
-        expect(await gnosisSafe.isModuleEnabled(GELATO)).to.be.true;
-        console.log(`✅ Gelato GnosisModule whitelisted.`);
+        // expect(await gnosisSafe.isModuleEnabled(GELATO)).to.be.true;
+        // console.log(`✅ Gelato GnosisModule whitelisted.`);
 
         // Provided Funds on Gelato
         expect(await gelatoCore.providerFunds(gnosisSafe.address)).to.be.gte(
-          FUNDS_TO_DEPOSIT
+          fundsToDeposit
         );
         console.log(
-          `✅ Deposited ${utils.formatEther(FUNDS_TO_DEPOSIT)} ETH on gelato`
+          `✅ Deposited ${utils.formatEther(fundsToDeposit)} ETH on gelato`
         );
         console.log(
           `Funds on Gelato: ${utils.formatEther(
@@ -245,8 +334,21 @@ describe("Create a GnosisSafe via CPK and setup with Gelato", function () {
           );
         }
 
+        // For our Task to be executable, our Provider must have sufficient funds on Gelato
+        const providerIsLiquid = await gelatoCore.isProviderLiquid(
+          cpk.address,
+          SELF_PROVIDER_GAS_LIMIT, // we need roughtly estimatedGasPerExecution * 3 executions as balance on gelato
+          triggerGasPrice
+        );
+        if (!providerIsLiquid) {
+          console.log(
+            "\n ❌  Ooops! Your GnosisSafe needs to provide more funds to Gelato \n"
+          );
+          process.exit(1);
+        }
+
         // SUCCESS !
-        console.log("\nUser Proxy succesfully set up ✅ \n");
+        console.log("\nUser Proxy succesfully set up and Task Submitted ✅ \n");
       } catch (error) {
         console.error("\n Gelato UserProxy Setup Error ❌  \n", error);
         process.exit(1);
