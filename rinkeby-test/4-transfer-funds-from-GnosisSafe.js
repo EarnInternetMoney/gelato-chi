@@ -7,7 +7,7 @@ const ethers = bre.ethers;
 const { utils } = require("ethers");
 
 // CPK Library
-const CPK = require("contract-proxy-kit");
+const CPK = require("contract-proxy-kit-custom");
 
 // running `npx buidler test` automatically makes use of buidler-waffle plugin
 // => only dependency we need is "chaFi"

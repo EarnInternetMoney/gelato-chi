@@ -7,7 +7,7 @@ const ethers = bre.ethers;
 const { constants, utils } = require("ethers");
 
 // CPK Library
-const CPK = require("contract-proxy-kit");
+const CPK = require("contract-proxy-kit-custom");
 
 // running `npx buidler test` automatically makes use of buidler-waffle plugin
 // => only dependency we need is "chaFi"
@@ -42,6 +42,11 @@ describe("MultiUnprovide on GELATO", function () {
       GelatoCoreLib.GelatoCore.abi,
       network.config.deployments.GelatoCore // the Rinkeby Address of the deployed GelatoCore
     );
+
+    // Get address of CPKFactoryCustom deployment
+    cpkFactoryCustomAddress = (await deployments.get("CPKFactoryCustom"))
+      .address;
+
     // Create CPK instance connected to new mastercopy
     cpk = await CPK.create({ ethers, signer: myUserWallet });
     expect(await cpk.getOwnerAccount()).to.be.equal(myUserAddress);
@@ -112,27 +117,30 @@ describe("MultiUnprovide on GELATO", function () {
         )} ETH`
       );
       try {
-        const tx = await cpk.execTransactions([
-          {
-            operation: CPK.CALL,
-            to: GELATO,
-            value: 0,
-            data: await bre.run("abi-encode-withselector", {
-              abi: GelatoCoreLib.GelatoCore.abi,
-              functionname: "unprovideFunds",
-              inputs: [providedFunds],
-            }),
-          },
-          {
-            operation: CPK.CALL,
-            to: myUserAddress,
-            value: providedFunds,
-            data: "0x",
-          },
-        ]);
+        const tx = await cpk.execTransactions(
+          [
+            {
+              operation: CPK.CALL,
+              to: GELATO,
+              value: 0,
+              data: await bre.run("abi-encode-withselector", {
+                abi: GelatoCoreLib.GelatoCore.abi,
+                functionname: "unprovideFunds",
+                inputs: [providedFunds],
+              }),
+            },
+            {
+              operation: CPK.CALL,
+              to: myUserAddress,
+              value: providedFunds,
+              data: "0x",
+            },
+          ],
+          { gasLimit: 4000000 }
+        );
         // Wait for mining
-        await tx.transactionResponse.wait();
         console.log(`Tx Hash: ${tx.hash}`);
+        await tx.transactionResponse.wait();
 
         const newFundsOnGelato = await gelatoCore.providerFunds(cpk.address);
         expect(newFundsOnGelato).to.be.equal(0);

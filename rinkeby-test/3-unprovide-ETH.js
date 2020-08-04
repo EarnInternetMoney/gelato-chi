@@ -7,7 +7,7 @@ const ethers = bre.ethers;
 const { utils } = require("ethers");
 
 // CPK Library
-const CPK = require("contract-proxy-kit");
+const CPK = require("contract-proxy-kit-custom");
 
 // running `npx buidler test` automatically makes use of buidler-waffle plugin
 // => only dependency we need is "chaFi"
@@ -85,24 +85,27 @@ describe("Unproviding ETH deposited on Gelato via GnosisSafe", function () {
       `\n Withdrawing ${utils.formatEther(fundsOnGelato)} ETH to userWallet`
     );
     try {
-      const tx = await cpk.execTransactions([
-        {
-          operation: CPK.CALL,
-          to: GELATO,
-          value: 0,
-          data: await bre.run("abi-encode-withselector", {
-            abi: GelatoCoreLib.GelatoCore.abi,
-            functionname: "unprovideFunds",
-            inputs: [fundsOnGelato],
-          }),
-        },
-        {
-          operation: CPK.CALL,
-          to: myUserAddress,
-          value: fundsOnGelato,
-          data: "0x",
-        },
-      ]);
+      const tx = await cpk.execTransactions(
+        [
+          {
+            operation: CPK.CALL,
+            to: GELATO,
+            value: 0,
+            data: await bre.run("abi-encode-withselector", {
+              abi: GelatoCoreLib.GelatoCore.abi,
+              functionname: "unprovideFunds",
+              inputs: [fundsOnGelato],
+            }),
+          },
+          {
+            operation: CPK.CALL,
+            to: myUserAddress,
+            value: fundsOnGelato,
+            data: "0x",
+          },
+        ],
+        { gasLimit: 2000000 }
+      );
       // Wait for mining
       await tx.transactionResponse.wait();
       console.log(`Tx Hash: ${tx.hash}`);
