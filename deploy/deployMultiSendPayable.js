@@ -3,7 +3,12 @@ const bre = require("@nomiclabs/buidler");
 const { utils } = require("ethers");
 
 module.exports = async ({ getNamedAccounts, deployments }) => {
-  if (bre.network.name === "mainnet") return;
+  if (bre.network.name === "mainnet") {
+    console.log(
+      "Already deployed MultiSendPayable to mainnet not using buidler-deploy"
+    );
+    return;
+  }
   const { deploy } = deployments;
   const { deployer } = await getNamedAccounts();
 
